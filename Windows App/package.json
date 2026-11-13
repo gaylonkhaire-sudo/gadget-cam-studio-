@@ -1,0 +1,65 @@
+{
+  "name": "gadget-cam-studio",
+  "productName": "Gadget Cam Studio",
+  "version": "1.0.0",
+  "description": "Record every camera at once with clean audio, color and framing.",
+  "author": "Gaylon",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never",
+    "release": "electron-builder --win --x64 --publish always --config.publish.provider=github --config.publish.releaseType=release"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "koffi": "^2.9.0",
+    "selfsigned": "^2.4.1",
+    "qrcode": "^1.5.4",
+    "@sapphi-red/web-noise-suppressor": "^0.3.0",
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.gaylonsgadgets.gadgetcamstudio",
+    "productName": "Gadget Cam Studio",
+    "files": [
+      "main.js",
+      "preload.js",
+      "vcam.js",
+      "phone-server.js",
+      "phone.html",
+      "app/**"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/koffi/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Gadget Cam Studio",
+      "include": "build/installer.nsh",
+      "perMachine": true
+    },
+    "extraResources": [
+      {
+        "from": "vcam-bin",
+        "to": "vcam",
+        "filter": [
+          "*.dll",
+          "*.exe"
+        ]
+      }
+    ]
+  }
+}

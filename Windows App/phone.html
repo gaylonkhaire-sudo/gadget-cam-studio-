@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Gadget Cam Studio</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#000;color:#fff;font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+  #start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:30px;text-align:center}
+  #start .dot{width:64px;height:64px;border-radius:18px;background:linear-gradient(145deg,#3a3a3c,#111);display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+  #start .dot i{width:24px;height:24px;border-radius:50%;background:#ff3b30;box-shadow:0 0 0 5px rgba(255,59,48,.2)}
+  #start h1{margin:4px 0 0;font-size:24px}
+  #start p{margin:0;color:#98989d;max-width:320px}
+  .big{margin-top:10px;height:50px;padding:0 34px;border:0;border-radius:25px;background:#0a84ff;color:#fff;font:600 17px -apple-system,system-ui}
+  #err{color:#ff453a;min-height:20px;max-width:340px}
+  .big.alt{margin-top:0;background:rgba(255,255,255,.14)}
+  #micui{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:30px}
+  #micui .ring{width:180px;height:180px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.06);box-shadow:0 0 0 calc(var(--lv,0) * 40px) rgba(48,209,88,.25);transition:box-shadow .08s}
+  #micui .ring b{width:120px;height:120px;border-radius:50%;background:#1c1c1e;display:grid;place-items:center;font-size:15px;font-weight:600}
+  #micui.muted .ring b{background:#ff3b30}
+  #micui .meter{width:240px;height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}
+  #micui .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#30d158 0 70%,#ff9f0a 70% 90%,#ff3b30 90%);background-size:240px 100%}
+  #micui .row{gap:10px}
+  #micui p{margin:0;color:#8e8e93;font-size:13px;text-align:center;max-width:300px}
+  body.dim #micui{opacity:.25}
+  video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  .top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;display:flex;align-items:center;gap:8px}
+  .chip{height:28px;padding:0 11px;border-radius:14px;background:rgba(0,0,0,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+  .chip.live{background:#30d158;color:#000}
+  .chip.wait{background:rgba(255,159,10,.9);color:#000}
+  .chip.mono{font:500 12px ui-monospace,Menlo,monospace}
+  .bar{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(env(safe-area-inset-bottom) + 14px);display:flex;flex-direction:column;gap:12px;background:linear-gradient(transparent,rgba(0,0,0,.65))}
+  .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .btn{height:40px;min-width:40px;padding:0 14px;border-radius:20px;border:0;background:rgba(255,255,255,.16);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);color:#fff;font:600 14px -apple-system,system-ui}
+  .btn.on{background:#fff;color:#000}
+  select.btn{-webkit-appearance:none;appearance:none;text-align:center}
+  input[type=range]{width:100%;accent-color:#fff}
+  .zoom{display:flex;align-items:center;gap:10px;font-size:13px;color:#d1d1d6;padding:0 6px}
+  .hide{display:none!important}
+  #hint{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none}
+  #hint span{background:rgba(0,0,0,.6);padding:10px 16px;border-radius:12px;font-size:14px;color:#d1d1d6}
+</style>
+</head>
+<body>
+<div id="start">
+  <div class="dot"><i></i></div>
+  <h1>Gadget Cam Studio</h1>
+  <p>Use this phone as a camera or a microphone. Keep it on the same Wi-Fi as your computer, and plugged in for long recordings.</p>
+  <button class="big" id="go">Use as camera</button>
+  <button class="big alt" id="goMic">Use as microphone</button>
+  <div id="err"></div>
+</div>
+
+<div id="micui" class="hide">
+  <span class="chip wait" id="mstate">Connecting…</span>
+  <div class="ring"><b id="mmute">Mic on</b></div>
+  <div class="meter"><i id="mlevel"></i></div>
+  <div class="row">
+    <button class="btn" id="mnoise">Noise reduction</button>
+    <button class="btn" id="mcam">Switch to camera</button>
+  </div>
+  <p>Tap the circle to mute. The screen dims after a few seconds to save battery; tap to wake it.</p>
+</div>
+<video id="v" autoplay playsinline muted class="hide"></video>
+<div class="top hide" id="top">
+  <span class="chip wait" id="state">Connecting…</span>
+  <span class="chip mono" id="stats"></span>
+</div>
+<div id="hint" class="hide"><span>Turn your phone sideways for 16:9</span></div>
+<div class="bar hide" id="bar">
+  <div class="zoom hide" id="zoomRow"><span>Zoom</span><input type="range" id="zoom" step="0.1"><span id="zoomV">1.0×</span></div>
+  <div class="row">
+    <select class="btn" id="lens"></select>
+    <select class="btn" id="quality">
+      <option value="2160-30">4K 30</option>
+      <option value="1080-60">1080p 60</option>
+      <option value="1080-30">1080p 30</option>
+      <option value="720-30">720p 30</option>
+    </select>
+    <button class="btn on" id="mic">Mic</button>
+    <button class="btn hide" id="torch">Light</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const K = new URLSearchParams(location.search).get('k');
+  const ID = localStorage.gcsPhoneId || (localStorage.gcsPhoneId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)));
+  const isIOS = /iPhone|iPad/.test(navigator.userAgent), isAndroid = /Android/.test(navigator.userAgent);
+  const BITRATE = { '2160-30': 40e6, '1080-60': 25e6, '1080-30': 18e6, '720-30': 10e6 };
+  const st = { mode: 'camera', quality: localStorage.gcsQuality || '2160-30', deviceId: localStorage.gcsLens || '', mic: localStorage.gcsMic !== '0', noise: localStorage.gcsNoise === '1', muted: false, torch: false, zoom: null };
+  let stream = null, pc = null, dc = null, es = null, lastBytes = 0, lastT = 0, wake = null;
+
+  const post = msg => fetch(`/signal?k=${encodeURIComponent(K)}`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ from: ID, ...msg }) }).catch(() => {});
+  const phoneName = () => {
+    const t = stream && stream.getVideoTracks()[0], lens = t ? t.label : '';
+    const model = isIOS ? 'iPhone' : isAndroid ? 'Android' : 'Phone';
+    if (st.mode === 'mic') return `${model} mic`;
+    return /front|user|selfie/i.test(lens) ? `${model} front` : /ultra/i.test(lens) ? `${model} ultra wide` : /tele/i.test(lens) ? `${model} telephoto` : model;
+  };
+  function setState(text, cls) { for (const s of [$('state'), $('mstate')]) { s.textContent = text; s.className = 'chip ' + cls; } }
+
+  async function getMicOnly() {
+    const s = await navigator.mediaDevices.getUserMedia({ video: false, audio: {
+      echoCancellation: false, noiseSuppression: st.noise, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 } } });
+    const at = s.getAudioTracks()[0]; if (at) { at.contentHint = 'speech'; at.enabled = !st.muted; }
+    return s;
+  }
+  async function getMedia() {
+    if (st.mode === 'mic') return getMicOnly();
+    const [h, fps] = st.quality.split('-').map(Number), w = Math.round(h * 16 / 9);
+    const video = { width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps } };
+    if (st.deviceId) video.deviceId = { exact: st.deviceId }; else video.facingMode = { ideal: 'environment' };
+    const audio = st.mic ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 }, sampleRate: { ideal: 48000 } } : false;
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ video, audio }); }
+    catch (e) {
+      if (e.name === 'OverconstrainedError' || e.name === 'NotReadableError') { delete video.deviceId; s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h } }, audio }); }
+      else throw e;
+    }
+    const vt = s.getVideoTracks()[0]; if (vt) vt.contentHint = 'detail';
+    const at = s.getAudioTracks()[0]; if (at) at.contentHint = 'music';
+    return s;
+  }
+
+  async function lensList() {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const cur = stream.getVideoTracks()[0].getSettings().deviceId;
+    st.deviceId = cur || st.deviceId;
+    $('lens').innerHTML = devs.map((d, i) => `<option value="${d.deviceId}" ${d.deviceId === cur ? 'selected' : ''}>${(d.label || 'Camera ' + (i + 1)).replace(/\s*camera\s*/i, ' ').trim() || 'Camera'}</option>`).join('');
+    $('lens').classList.toggle('hide', devs.length < 2);
+    return devs;
+  }
+
+  function caps() {
+    if (st.mode === 'mic') return { type: 'caps', mode: 'mic', muted: st.muted, noise: st.noise, name: phoneName() };
+    const t = stream && stream.getVideoTracks()[0]; if (!t) return {};
+    const c = t.getCapabilities ? t.getCapabilities() : {}, s = t.getSettings();
+    return { type: 'caps', devices: [...$('lens').options].map(o => ({ id: o.value, label: o.textContent })), deviceId: s.deviceId,
+      quality: st.quality, mic: st.mic, w: s.width, h: s.height, fps: Math.round(s.frameRate || 0),
+      zoom: c.zoom ? { min: c.zoom.min, max: c.zoom.max, step: c.zoom.step || 0.1, value: s.zoom || c.zoom.min } : null,
+      torch: !!c.torch, torchOn: !!s.torch, name: phoneName() };
+  }
+  function paintControls() {
+    const c = caps();
+    if (st.mode === 'mic') {
+      $('micui').classList.toggle('muted', st.muted); $('mmute').textContent = st.muted ? 'Muted' : 'Mic on';
+      $('mnoise').classList.toggle('on', st.noise);
+      if (dc && dc.readyState === 'open') dc.send(JSON.stringify(c));
+      return;
+    }
+    $('quality').value = st.quality;
+    $('mic').classList.toggle('on', st.mic);
+    $('torch').classList.toggle('hide', !c.torch); $('torch').classList.toggle('on', !!c.torchOn);
+    $('zoomRow').classList.toggle('hide', !c.zoom);
+    if (c.zoom) { const z = $('zoom'); z.min = c.zoom.min; z.max = c.zoom.max; z.step = c.zoom.step; z.value = c.zoom.value; $('zoomV').textContent = (+c.zoom.value).toFixed(1) + '×'; }
+    if (dc && dc.readyState === 'open') dc.send(JSON.stringify(c));
+  }
+
+  async function tune() {
+    if (!pc) return;
+    for (const s of pc.getSenders()) {
+      if (!s.track) continue;
+      const p = s.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      if (s.track.kind === 'video') {
+        const fps = +st.quality.split('-')[1];
+        p.encodings[0].maxBitrate = BITRATE[st.quality];
+        p.encodings[0].maxFramerate = fps;
+        p.encodings[0].scaleResolutionDownBy = 1;
+        p.encodings[0].priority = 'high'; p.encodings[0].networkPriority = 'high';
+        p.degradationPreference = 'maintain-resolution';
+      } else { p.encodings[0].maxBitrate = 320000; p.encodings[0].priority = 'high'; }
+      try { await s.setParameters(p); } catch {}
+    }
+  }
+
+  async function swapMedia() {
+    const old = stream;
+    stream = await getMedia();
+    $('v').srcObject = stream;
+    if (pc) for (const tr of pc.getTransceivers()) {
+      const kind = tr.receiver.track && tr.receiver.track.kind;
+      const t = kind === 'video' ? (stream.getVideoTracks()[0] || null) : kind === 'audio' ? (stream.getAudioTracks()[0] || null) : undefined;
+      if (t !== undefined) await tr.sender.replaceTrack(t);
+    }
+    if (old) old.getTracks().forEach(t => t.stop());
+    if (st.mode === 'mic') { meter(); await tune(); paintControls(); return; }
+    st.deviceId = stream.getVideoTracks()[0].getSettings().deviceId || st.deviceId;
+    localStorage.gcsLens = st.deviceId; localStorage.gcsQuality = st.quality; localStorage.gcsMic = st.mic ? '1' : '0';
+    await lensList(); await tune(); paintControls(); hint();
+  }
+
+  async function setZoom(z) { const t = stream.getVideoTracks()[0]; try { await t.applyConstraints({ advanced: [{ zoom: +z }] }); } catch {} paintControls(); }
+  async function setTorch(on) { const t = stream.getVideoTracks()[0]; try { await t.applyConstraints({ advanced: [{ torch: !!on }] }); } catch {} paintControls(); }
+
+  async function onOffer(sdp) {
+    if (pc) { try { pc.close(); } catch {} }
+    pc = new RTCPeerConnection({ iceServers: [] });
+    pc.onicecandidate = e => { if (e.candidate) post({ to: 'app', type: 'ice', candidate: e.candidate }); };
+    pc.ondatachannel = e => {
+      dc = e.channel;
+      dc.onopen = () => paintControls();
+      dc.onmessage = async m => {
+        const c = JSON.parse(m.data);
+        if (c.cmd !== 'set') return;
+        let reget = false;
+        if (typeof c.muted === 'boolean') { st.muted = c.muted; stream.getAudioTracks().forEach(t => t.enabled = !st.muted); }
+        if (typeof c.noise === 'boolean' && c.noise !== st.noise) { st.noise = c.noise; localStorage.gcsNoise = st.noise ? '1' : '0'; reget = true; }
+        if (c.deviceId && c.deviceId !== st.deviceId) { st.deviceId = c.deviceId; reget = true; }
+        if (c.quality && c.quality !== st.quality) { st.quality = c.quality; reget = true; }
+        if (typeof c.mic === 'boolean' && c.mic !== st.mic) { st.mic = c.mic; reget = true; }
+        if (reget) await swapMedia();
+        if (c.zoom != null) await setZoom(c.zoom);
+        if (typeof c.torch === 'boolean') await setTorch(c.torch);
+        paintControls();
+      };
+    };
+    pc.onconnectionstatechange = () => {
+      const s = pc.connectionState;
+      if (s === 'connected') { setState('Live', 'live'); tune(); }
+      else if (s === 'failed' || s === 'disconnected') { setState('Reconnecting…', 'wait'); setTimeout(() => { if (pc && pc.connectionState !== 'connected') hello(); }, 2500); }
+    };
+    await pc.setRemoteDescription({ type: 'offer', sdp });
+    for (const tr of pc.getTransceivers()) {
+      const kind = tr.receiver.track.kind;
+      const t = kind === 'video' ? (stream.getVideoTracks()[0] || null) : stream.getAudioTracks()[0] || null;
+      await tr.sender.replaceTrack(t);
+      tr.direction = 'sendonly';
+      if (t) { try { tr.sender.setStreams && tr.sender.setStreams(stream); } catch {} }
+    }
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    post({ to: 'app', type: 'answer', sdp: pc.localDescription.sdp });
+    tune();
+  }
+
+  function hello() { post({ to: 'app', type: 'hello', name: phoneName(), mode: st.mode }); }
+
+  function connect() {
+    es = new EventSource(`/events?role=phone&id=${encodeURIComponent(ID)}&k=${encodeURIComponent(K)}`);
+    es.onopen = () => { setState('Waiting for Gadget Cam Studio…', 'wait'); hello(); };
+    es.onerror = () => setState('Reconnecting…', 'wait');
+    es.onmessage = async e => {
+      const m = JSON.parse(e.data);
+      try {
+        if (m.type === 'offer') await onOffer(m.sdp);
+        else if (m.type === 'ice' && pc) await pc.addIceCandidate(m.candidate);
+        else if (m.type === 'who') hello();
+      } catch (err) { console.warn(err); }
+    };
+  }
+
+  async function stats() {
+    if (!pc || st.mode === 'mic') return;
+    const r = await pc.getStats(); let out = null;
+    r.forEach(s => { if (s.type === 'outbound-rtp' && s.kind === 'video') out = s; });
+    if (!out) return;
+    const now = performance.now(), mbps = lastT ? (out.bytesSent - lastBytes) * 8 / ((now - lastT) / 1000) / 1e6 : 0;
+    lastBytes = out.bytesSent; lastT = now;
+    const lim = out.qualityLimitationReason && out.qualityLimitationReason !== 'none' ? ` · limited by ${out.qualityLimitationReason}` : '';
+    $('stats').textContent = `${out.frameWidth || '?'}×${out.frameHeight || '?'} · ${Math.round(out.framesPerSecond || 0)} fps · ${mbps.toFixed(1)} Mbps${lim}`;
+    if (dc && dc.readyState === 'open') dc.send(JSON.stringify({ type: 'stats', w: out.frameWidth, h: out.frameHeight, fps: out.framesPerSecond, mbps, limit: out.qualityLimitationReason }));
+  }
+
+  let actx = null, an = null, raf = 0, dimT = 0;
+  function meter() {
+    try {
+      actx = actx || new AudioContext();
+      const src = actx.createMediaStreamSource(stream); an = actx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+      const buf = new Float32Array(1024);
+      cancelAnimationFrame(raf);
+      const loop = () => { an.getFloatTimeDomainData(buf); let pk = 0; for (const v of buf) pk = Math.max(pk, Math.abs(v));
+        const lv = st.muted ? 0 : Math.max(0, Math.min(1, (20 * Math.log10(pk || 1e-6) + 60) / 60));
+        $('mlevel').style.width = (lv * 100) + '%'; $('micui').style.setProperty('--lv', lv.toFixed(2)); raf = requestAnimationFrame(loop); };
+      loop();
+    } catch {}
+  }
+  function wakeScreen() { document.body.classList.remove('dim'); clearTimeout(dimT); dimT = setTimeout(() => { if (st.mode === 'mic') document.body.classList.add('dim'); }, 8000); }
+  function hint() {
+    if (st.mode === 'mic') { $('hint').classList.add('hide'); return; } const portrait = innerHeight > innerWidth; $('hint').classList.toggle('hide', !portrait); }
+  async function keepAwake() { try { wake = await navigator.wakeLock.request('screen'); } catch {} }
+
+  async function begin(mode) {
+    st.mode = mode;
+    $('err').textContent = '';
+    if (!navigator.mediaDevices || !window.RTCPeerConnection) { $('err').textContent = 'This browser can’t share its camera. Use Safari on iPhone or Chrome on Android.'; return; }
+    try {
+      stream = await getMedia();
+    } catch (e) {
+      $('err').textContent = e.name === 'NotAllowedError' ? 'Camera access was blocked. Allow it in your browser settings, then try again.' : 'Could not start the camera: ' + e.message; return;
+    }
+    $('start').classList.add('hide');
+    if (mode === 'mic') {
+      $('micui').classList.remove('hide'); meter(); wakeScreen();
+      document.addEventListener('pointerdown', wakeScreen);
+      try { actx && actx.resume(); } catch {}
+    } else {
+      ['v', 'top', 'bar'].forEach(id => $(id).classList.remove('hide'));
+      $('v').srcObject = stream;
+      await lensList();
+    }
+    paintControls(); hint(); keepAwake();
+    if (!es) { connect(); setInterval(stats, 2000); }
+    else { if (pc) { try { pc.close(); } catch {} pc = null; } hello(); }
+  }
+  $('go').onclick = () => begin('camera');
+  $('goMic').onclick = () => begin('mic');
+  $('mmute').parentElement.onclick = () => { st.muted = !st.muted; stream.getAudioTracks().forEach(t => t.enabled = !st.muted); paintControls(); };
+  $('mnoise').onclick = async () => { st.noise = !st.noise; localStorage.gcsNoise = st.noise ? '1' : '0'; await swapMedia(); };
+  $('mcam').onclick = async () => {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    $('micui').classList.add('hide'); document.body.classList.remove('dim');
+    await begin('camera');
+  };
+  $('lens').onchange = async e => { st.deviceId = e.target.value; await swapMedia(); };
+  $('quality').onchange = async e => { st.quality = e.target.value; await swapMedia(); };
+  $('mic').onclick = async () => { st.mic = !st.mic; await swapMedia(); };
+  $('torch').onclick = () => setTorch(!caps().torchOn);
+  $('zoom').oninput = e => { $('zoomV').textContent = (+e.target.value).toFixed(1) + '×'; setZoom(e.target.value); };
+  addEventListener('resize', hint);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+  window.__gcs = { st, get pc() { return pc; } };   // for testing
+})();
+</script>
+</body>
+</html>

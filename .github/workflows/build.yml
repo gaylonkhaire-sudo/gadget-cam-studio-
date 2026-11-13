@@ -1,0 +1,59 @@
+# Builds the Gadget Cam Studio camera driver and the Windows installer on GitHub's Windows machines.
+# Every push (or "Run workflow" on the Actions tab) produces a downloadable installer under the run's Artifacts.
+# Pushing a version tag such as v1.1.0 also publishes a GitHub Release, which installed apps update from automatically.
+name: Build Gadget Cam Studio
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find the project
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem -Recurse -Directory -Filter "Windows App" | Select-Object -First 1
+          if (-not $app) { throw "Windows App folder not found. Upload the contents of the Gadget Cam Studio folder." }
+          "ROOT=$($app.Parent.FullName)" >> $env:GITHUB_ENV
+
+      - name: Build the virtual camera
+        shell: pwsh
+        run: |
+          cmake -S "$env:ROOT/Camera Driver" -B build-cam -A x64
+          cmake --build build-cam --config Release
+          New-Item -ItemType Directory -Force "$env:ROOT/Windows App/vcam-bin" | Out-Null
+          Copy-Item build-cam/Release/GcsCamSource.dll "$env:ROOT/Windows App/vcam-bin/"
+          Copy-Item build-cam/Release/gcs-vcam.exe "$env:ROOT/Windows App/vcam-bin/"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the installer
+        shell: pwsh
+        working-directory: ${{ env.ROOT }}/Windows App
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm install
+          $owner, $repo = "${{ github.repository }}".Split('/')
+          $pub = @("--config.publish.provider=github", "--config.publish.owner=$owner", "--config.publish.repo=$repo", "--config.publish.releaseType=release")
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $v = "${{ github.ref_name }}".TrimStart('v')
+            npm version $v --no-git-tag-version --allow-same-version
+            npx electron-builder --win --x64 --publish always $pub
+          } else {
+            npx electron-builder --win --x64 --publish never $pub
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Gadget-Cam-Studio-Installer
+          path: ${{ env.ROOT }}/Windows App/dist/*.exe
