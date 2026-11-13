@@ -11,6 +11,7 @@
 #include <mfobjects.h>
 #include <ks.h>
 #include <ksmedia.h>
+#include <ksproxy.h>   // IKsControl
 #include <sddl.h>
 #include <wrl/client.h>
 #include <new>
